@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 export function ChatInterface() {
   const [messages, setMessages] = useState<MessageType[]>([]);
   const [isTyping, setIsTyping] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const messagesEndRef = useRef<null | HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -24,8 +25,14 @@ export function ChatInterface() {
   useEffect(scrollToBottom, [messages]);
   
   useEffect(() => {
+    // Generate conversation ID on client mount
+    // This runs only on the client after hydration
+    setConversationId(self.crypto.randomUUID());
+
     // Initial welcome message from Nova
     // Check if messages is empty to avoid adding on re-renders if component remounts for other reasons
+    // This check is important if we were to, for example, fetch initial messages.
+    // For a static welcome message, it's fine to always set it if messages array is empty.
     if (messages.length === 0) {
        setMessages([
         {
@@ -36,10 +43,19 @@ export function ChatInterface() {
       ]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty dependency array ensures this runs once on mount
+  }, []); // Empty dependency array ensures this runs once on mount on the client
 
 
   const handleSendMessage = async (text: string) => {
+    if (!conversationId) {
+      toast({
+        title: "Initialization Error",
+        description: "Conversation ID not yet available. Please wait a moment and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const userMessage: MessageType = {
       id: self.crypto.randomUUID(),
       text,
@@ -49,12 +65,12 @@ export function ChatInterface() {
     setIsTyping(true);
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/chat", {
+      const response = await fetch("http://127.0.0.1:8000/chat/", { // Added trailing slash
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({ message: text, conversation_id: conversationId }), // Added conversation_id
       });
 
       if (!response.ok) {
@@ -76,6 +92,7 @@ export function ChatInterface() {
       }
 
       const data = await response.json();
+      // Backend returns { "response": "chatbot reply", "conversation_id": "..." }
       if (data && typeof data.response === 'string') {
         const botMessage: MessageType = {
           id: self.crypto.randomUUID(),
@@ -122,7 +139,7 @@ export function ChatInterface() {
 
       {isTyping && <TypingIndicator />}
 
-      <ChatInput onSendMessage={handleSendMessage} disabled={isTyping} />
+      <ChatInput onSendMessage={handleSendMessage} disabled={isTyping || !conversationId} />
     </div>
   );
 }
