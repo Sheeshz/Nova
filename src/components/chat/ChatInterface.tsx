@@ -62,7 +62,6 @@ export function ChatInterface() {
       sender: "user",
     };
     setMessages((prevMessages) => [...prevMessages, userMessage]);
-    setIsTyping(true);
 
     try {
       const response = await fetch("http://127.0.0.1:8000/chat/", { // Added trailing slash
@@ -72,6 +71,7 @@ export function ChatInterface() {
         },
         body: JSON.stringify({ message: text, conversation_id: conversationId }), // Added conversation_id
       });
+      setIsTyping(true);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -93,13 +93,13 @@ export function ChatInterface() {
 
       const data = await response.json();
       // Backend returns { "response": "chatbot reply", "conversation_id": "..." }
-      if (data && typeof data.response === 'string') {
+      if (data && typeof data.reply === 'string') {
         const botMessage: MessageType = {
           id: self.crypto.randomUUID(),
-          text: data.response,
+          text: data.reply,
           sender: "bot",
         };
-        setMessages((prevMessages) => [...prevMessages, botMessage]);
+        setMessages((prevMessages) => [...prevMessages, botMessage]); // Corrected this line
       } else {
          throw new Error("Invalid response format from server. 'response' field missing or not a string.");
       }
